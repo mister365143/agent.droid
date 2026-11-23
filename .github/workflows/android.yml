@@ -34,30 +34,36 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Enable KVM access
-        run: |
-          echo "=== /dev/kvm before ==="
-          ls -l /dev/kvm || echo "no /dev/kvm device node present"
-          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
-          sudo udevadm control --reload-rules
-          sudo udevadm trigger --name-match=kvm
-          echo "=== /dev/kvm after ==="
-          ls -l /dev/kvm || echo "no /dev/kvm device node present"
+  smoke:
+    name: Launch on emulator
+    needs: build
+    # GitHub-hosted Linux runners have no nested virtualisation, so the
+    # emulator only gets a hypervisor on the macOS runners.
+    runs-on: macos-latest
 
-      - name: Smoke test on emulator
+    steps:
+      - name: Download debug APK
+        uses: actions/download-artifact@v4
+        with:
+          name: agent.droid-debug-apk
+          path: apk
+
+      - name: Install and launch MainActivity
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 34
-          arch: x86_64
+          target: google_apis
+          arch: arm64-v8a
           disable-animations: true
           emulator-boot-timeout: 600
           script: |
             set -e
-            APK=app/build/outputs/apk/debug/app-debug.apk
+            APK=$(ls apk/*.apk)
             PKG=dev.agentdroid.app
             ACTIVITY=$PKG/.MainActivity
+            echo "APK: $APK"
 
-            # 1. Install the APK we just built.
+            # 1. Install the APK that the build job produced.
             INSTALL_OUT=$(adb install -r "$APK" 2>&1) || {
               echo "::error::INSTALL_FAILED: $(printf '%s' "$INSTALL_OUT" | tr '\n' ' ')"
               exit 1
