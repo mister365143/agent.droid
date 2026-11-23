@@ -2,15 +2,15 @@ package dev.agentdroid.app
 
 import android.app.Activity
 import android.os.Bundle
+import android.text.format.DateFormat as AndroidDateFormat
 import android.widget.Button
 import android.widget.TextView
 import dev.agentdroid.app.audit.AuditEntry
 import dev.agentdroid.app.audit.AuditTrail
 import dev.agentdroid.app.screen.ScreenAccess
 import dev.agentdroid.app.screen.ScreenNode
-import java.text.SimpleDateFormat
+import java.text.DateFormat
 import java.util.Date
-import java.util.Locale
 
 /**
  * Minimal agent console: shows an activity log and lets you start/stop a
@@ -27,7 +27,7 @@ class MainActivity : Activity() {
 
     private lateinit var trail: AuditTrail
     private val entries = mutableListOf<AuditEntry>()
-    private val clock = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
+    private lateinit var clock: DateFormat
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -38,8 +38,9 @@ class MainActivity : Activity() {
         screenAccess = findViewById(R.id.screen_access)
         screenAccess.setOnClickListener { ScreenAccess.openSettings(this) }
 
+        clock = AndroidDateFormat.getTimeFormat(this)
         trail = AuditTrail(this)
-        entries += trail.recent()
+        entries += trail.readAll()
 
         findViewById<Button>(R.id.run).setOnClickListener { runAgent() }
         findViewById<Button>(R.id.capture).setOnClickListener { captureScreen() }
@@ -100,7 +101,7 @@ class MainActivity : Activity() {
                 .take(MAX_CAPTURE_LINES)
                 .forEach { add("  $it") }
         }
-        append(capture.joinToString("\n"), AuditEntry.Kind.CAPTURE)
+        append(capture.joinToString("\n"))
     }
 
     /** One log line for a labelled node; containers without a label are skipped. */
@@ -113,8 +114,8 @@ class MainActivity : Activity() {
         return "[$kind$tappable] ${label.take(60)}"
     }
 
-    private fun append(text: String, kind: AuditEntry.Kind = AuditEntry.Kind.LOG) {
-        val entry = AuditEntry(System.currentTimeMillis(), kind, text)
+    private fun append(text: String) {
+        val entry = AuditEntry(System.currentTimeMillis(), text)
         entries += entry
         trail.record(entry)
         render()
