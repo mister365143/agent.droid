@@ -42,6 +42,20 @@ class MainActivityTest {
     }
 
     @Test
+    fun logSurvivesActivityRestart() {
+        val first = Robolectric.buildActivity(MainActivity::class.java).setup().get()
+        first.findViewById<Button>(R.id.run).performClick()
+
+        val second = Robolectric.buildActivity(MainActivity::class.java).setup().get()
+
+        val restored = second.findViewById<TextView>(R.id.log).text.toString()
+        assertTrue(
+            "expected the earlier session in the restored trail, got: $restored",
+            restored.contains("Planning task") && restored.contains("Session started"),
+        )
+    }
+
+    @Test
     fun captureButtonReportsWhenScreenAccessIsOff() {
         val activity = Robolectric.buildActivity(MainActivity::class.java).setup().get()
 

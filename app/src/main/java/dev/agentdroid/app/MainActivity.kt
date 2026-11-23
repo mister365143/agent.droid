@@ -4,12 +4,20 @@ import android.app.Activity
 import android.os.Bundle
 import android.widget.Button
 import android.widget.TextView
+import dev.agentdroid.app.audit.AuditEntry
+import dev.agentdroid.app.audit.AuditTrail
 import dev.agentdroid.app.screen.ScreenAccess
 import dev.agentdroid.app.screen.ScreenNode
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 /**
  * Minimal agent console: shows an activity log and lets you start/stop a
  * local placeholder agent run. Replace [runAgent] with the real agent loop.
+ *
+ * The log is the on-device audit trail from ADR 0001: every line is appended to
+ * [AuditTrail] and replayed on start, so it survives a restart. Reset wipes it.
  */
 class MainActivity : Activity() {
 
@@ -17,7 +25,9 @@ class MainActivity : Activity() {
     private lateinit var log: TextView
     private lateinit var screenAccess: TextView
 
-    private val lines = mutableListOf<String>()
+    private lateinit var trail: AuditTrail
+    private val entries = mutableListOf<AuditEntry>()
+    private val clock = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -28,10 +38,14 @@ class MainActivity : Activity() {
         screenAccess = findViewById(R.id.screen_access)
         screenAccess.setOnClickListener { ScreenAccess.openSettings(this) }
 
+        trail = AuditTrail(this)
+        entries += trail.recent()
+
         findViewById<Button>(R.id.run).setOnClickListener { runAgent() }
         findViewById<Button>(R.id.capture).setOnClickListener { captureScreen() }
         findViewById<Button>(R.id.reset).setOnClickListener {
-            lines.clear()
+            entries.clear()
+            trail.clear()
             render()
         }
 
@@ -56,7 +70,7 @@ class MainActivity : Activity() {
     }
 
     /**
-     * Read-only capture through the accessibility service: prints what is on
+     * Read-only capture through the accessibility service: records what is on
      * screen and nothing more. No actions, no network — this exists to exercise
      * the typed surface the agent will later reason over.
      */
@@ -71,19 +85,22 @@ class MainActivity : Activity() {
             return
         }
 
-        append(
-            getString(
-                R.string.screen_capture_summary,
-                snapshot.packageName ?: getString(R.string.screen_package_unknown),
-                snapshot.nodes.size,
-                if (snapshot.truncated) getString(R.string.screen_capture_truncated) else "",
-            ),
-        )
-        snapshot.nodes
-            .mapNotNull { it.describe() }
-            .distinct()
-            .take(MAX_CAPTURE_LINES)
-            .forEach { append("  $it") }
+        val capture = buildList {
+            add(
+                getString(
+                    R.string.screen_capture_summary,
+                    snapshot.packageName ?: getString(R.string.screen_package_unknown),
+                    snapshot.nodes.size,
+                    if (snapshot.truncated) getString(R.string.screen_capture_truncated) else "",
+                ),
+            )
+            snapshot.nodes
+                .mapNotNull { it.describe() }
+                .distinct()
+                .take(MAX_CAPTURE_LINES)
+                .forEach { add("  $it") }
+        }
+        append(capture.joinToString("\n"), AuditEntry.Kind.CAPTURE)
     }
 
     /** One log line for a labelled node; containers without a label are skipped. */
@@ -96,13 +113,18 @@ class MainActivity : Activity() {
         return "[$kind$tappable] ${label.take(60)}"
     }
 
-    private fun append(line: String) {
-        lines += line
+    private fun append(text: String, kind: AuditEntry.Kind = AuditEntry.Kind.LOG) {
+        val entry = AuditEntry(System.currentTimeMillis(), kind, text)
+        entries += entry
+        trail.record(entry)
         render()
     }
 
+    /** The trail is only ever displayed, never edited in place. */
     private fun render() {
-        log.text = lines.joinToString("\n") { "> $it" }
+        log.text = entries.joinToString("\n") { entry ->
+            "> ${clock.format(Date(entry.atMillis))} ${entry.text}"
+        }
     }
 
     private companion object {
