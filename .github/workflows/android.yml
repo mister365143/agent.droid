@@ -33,3 +33,33 @@ jobs:
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 14
+
+      - name: Smoke test on emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          disable-animations: true
+          emulator-boot-timeout: 900
+          script: |
+            set -e
+            APK=app/build/outputs/apk/debug/app-debug.apk
+
+            adb install -r "$APK"
+            adb shell am start -W -n dev.agentdroid.app/.MainActivity
+            sleep 5
+
+            # The process must still be alive, not have died on start-up.
+            adb shell pidof dev.agentdroid.app > /dev/null
+
+            # MainActivity must actually be the resumed (foreground) activity.
+            adb shell dumpsys activity activities | grep -q "mResumedActivity.*dev.agentdroid.app"
+
+            # The crash buffer must not mention us.
+            if adb logcat -d -b crash | grep -q "dev.agentdroid.app"; then
+              echo "::error::agent.droid crashed on launch"
+              adb logcat -d -b crash
+              exit 1
+            fi
+
+            echo "MainActivity launched and is in the foreground"
