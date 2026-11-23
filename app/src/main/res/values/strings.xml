@@ -10,4 +10,10 @@
     <string name="screen_access_description">Lets agent.droid read the text on your screen. It never taps or types on its own.</string>
     <string name="screen_access_off">Screen access: off — tap to enable in Settings</string>
     <string name="screen_access_on">Screen access: on — tap to change</string>
+    <string name="capture_screen">Capture screen</string>
+    <string name="screen_capture_off">Screen access is off — enable it from the row above</string>
+    <string name="screen_capture_unreadable">Screen access is on, but nothing is readable right now</string>
+    <string name="screen_capture_summary">Screen %1$s · %2$d nodes%3$s</string>
+    <string name="screen_capture_truncated"> (truncated)</string>
+    <string name="screen_package_unknown">unknown</string>
 </resources>

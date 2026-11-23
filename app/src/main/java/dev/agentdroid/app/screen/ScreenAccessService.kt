@@ -6,7 +6,6 @@ import android.content.Context
 import android.content.Intent
 import android.provider.Settings
 import android.view.accessibility.AccessibilityEvent
-import java.lang.ref.WeakReference
 
 /**
  * The single capability ADR 0001 commits to: read the current screen.
@@ -28,29 +27,20 @@ class ScreenAccessService : AccessibilityService() {
 
     override fun onServiceConnected() {
         super.onServiceConnected()
-        current = WeakReference(this)
+        connected = this
     }
 
-    override fun onUnbind(intent: Intent?): Boolean {
-        current = null
-        return super.onUnbind(intent)
+    override fun onDestroy() {
+        connected = null
+        super.onDestroy()
     }
 
-    /** Reads the active window now, or null if it cannot be read. */
-    internal fun readCurrentScreen(): ScreenSnapshot? {
-        val root = try {
-            rootInActiveWindow
-        } catch (_: SecurityException) {
-            // The user can revoke accessibility access at any time.
-            null
-        }
-        return snapshotOf(root)
-    }
+    internal fun readCurrentScreen(): ScreenSnapshot? = snapshotOf(rootInActiveWindow)
 
     companion object {
-        private var current: WeakReference<ScreenAccessService>? = null
+        private var connected: ScreenAccessService? = null
 
-        internal fun instance(): ScreenAccessService? = current?.get()
+        internal fun instance(): ScreenAccessService? = connected
     }
 }
 
@@ -69,18 +59,20 @@ object ScreenAccess {
         val enabled = Settings.Secure.getString(
             resolver,
             Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES,
-        ) ?: return false
+        ).orEmpty()
 
-        val expected = ComponentName(context, ScreenAccessService::class.java)
-        return enabled.split(':')
-            .mapNotNull { ComponentName.unflattenFromString(it) }
-            .any { it.matches(expected) }
+        // Settings stores either the full or the short component name.
+        val component = ComponentName(context, ScreenAccessService::class.java)
+        return enabled.split(':').any {
+            it.equals(component.flattenToString(), ignoreCase = true) ||
+                it.equals(component.flattenToShortString(), ignoreCase = true)
+        }
     }
 
     /**
      * The screen as it is right now, or null when the service is off or its
-     * active window cannot be read. Callers must check [isEnabled] first to
-     * tell "off" apart from "nothing readable".
+     * active window cannot be read. Callers check [isEnabled] first to tell
+     * "off" apart from "nothing readable".
      */
     fun currentScreen(): ScreenSnapshot? = ScreenAccessService.instance()?.readCurrentScreen()
 
@@ -91,10 +83,4 @@ object ScreenAccess {
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
         )
     }
-
-    /** Settings may store the component with either a full or a relative class name. */
-    private fun ComponentName.matches(expected: ComponentName): Boolean =
-        packageName == expected.packageName &&
-            (className == expected.className ||
-                expected.className.endsWith(className.removePrefix(".")))
 }

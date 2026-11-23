@@ -42,6 +42,19 @@ class MainActivityTest {
     }
 
     @Test
+    fun captureButtonReportsWhenScreenAccessIsOff() {
+        val activity = Robolectric.buildActivity(MainActivity::class.java).setup().get()
+
+        activity.findViewById<Button>(R.id.capture).performClick()
+
+        val log = activity.findViewById<TextView>(R.id.log).text.toString()
+        assertTrue(
+            "expected the screen-access hint, got: $log",
+            log.contains(activity.getString(R.string.screen_capture_off)),
+        )
+    }
+
+    @Test
     fun resetButtonClearsLog() {
         val activity = Robolectric.buildActivity(MainActivity::class.java).setup().get()
 

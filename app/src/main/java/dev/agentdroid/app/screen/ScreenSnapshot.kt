@@ -17,31 +17,22 @@ data class ScreenSnapshot(
     val truncated: Boolean,
 )
 
-/** One element of the accessibility tree, flattened. */
+/** One labelled element of the accessibility tree. */
 data class ScreenNode(
-    val depth: Int,
     val className: String?,
     val text: String?,
     val contentDescription: String?,
-    val viewId: String?,
     val bounds: Bounds,
     val clickable: Boolean,
-    val editable: Boolean,
-    val scrollable: Boolean,
 )
 
 /** Screen-space bounds in pixels, as reported by the platform. */
 data class Bounds(val left: Int, val top: Int, val right: Int, val bottom: Int)
 
-/**
- * Bounds on what a single read costs: a hostile or enormous screen can produce a
- * tree with tens of thousands of nodes, so traversal is capped rather than
- * unbounded.
- */
-object ScreenTreeLimits {
-    const val MAX_NODES = 400
-    const val MAX_DEPTH = 24
-}
+// A hostile or enormous screen can produce a tree with tens of thousands of
+// nodes, so traversal is capped rather than unbounded.
+private const val MAX_NODES = 400
+private const val MAX_DEPTH = 24
 
 /**
  * Flattens an accessibility tree into a [ScreenSnapshot], breadth first so the
@@ -51,30 +42,30 @@ object ScreenTreeLimits {
 internal fun snapshotOf(
     root: AccessibilityNodeInfo?,
     nowMillis: Long = System.currentTimeMillis(),
-    maxNodes: Int = ScreenTreeLimits.MAX_NODES,
+    maxNodes: Int = MAX_NODES,
 ): ScreenSnapshot? {
     if (root == null) return null
 
     val nodes = ArrayList<ScreenNode>(minOf(maxNodes, 128))
-    val pending = ArrayDeque<NodeAtDepth>()
+    val pending = ArrayDeque<Pair<AccessibilityNodeInfo, Int>>()
     var truncated = false
 
-    pending.addLast(NodeAtDepth(root, 0))
+    pending.addLast(root to 0)
     while (pending.isNotEmpty()) {
         if (nodes.size >= maxNodes) {
             truncated = true
             break
         }
         val (node, depth) = pending.removeFirst()
-        nodes += node.toScreenNode(depth)
+        nodes += node.toScreenNode()
 
-        if (depth >= ScreenTreeLimits.MAX_DEPTH) {
+        if (depth >= MAX_DEPTH) {
             if (node.childCount > 0) truncated = true
             continue
         }
         for (index in 0 until node.childCount) {
             val child = node.getChild(index) ?: continue
-            pending.addLast(NodeAtDepth(child, depth + 1))
+            pending.addLast(child to depth + 1)
         }
     }
 
@@ -86,20 +77,14 @@ internal fun snapshotOf(
     )
 }
 
-private data class NodeAtDepth(val node: AccessibilityNodeInfo, val depth: Int)
-
-private fun AccessibilityNodeInfo.toScreenNode(depth: Int): ScreenNode {
+private fun AccessibilityNodeInfo.toScreenNode(): ScreenNode {
     val rect = Rect()
     getBoundsInScreen(rect)
     return ScreenNode(
-        depth = depth,
         className = className?.toString(),
         text = text?.toString(),
         contentDescription = contentDescription?.toString(),
-        viewId = viewIdResourceName,
         bounds = Bounds(rect.left, rect.top, rect.right, rect.bottom),
         clickable = isClickable,
-        editable = isEditable,
-        scrollable = isScrollable,
     )
 }
