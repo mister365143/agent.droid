@@ -42,10 +42,10 @@ jobs:
           retention-days: 14
 
   # The real thing: install the APK on an Android device and launch MainActivity.
-  # The emulator needs hardware acceleration (/dev/kvm, or the macOS hypervisor
-  # framework) and GitHub-hosted runners cannot nest virtualization, so this job
-  # is pinned to a self-hosted runner that has a hypervisor and only runs when
-  # dispatched by hand. Normal pushes stay green even when no such runner exists.
+  # The emulator needs hardware acceleration (/dev/kvm), and GitHub-hosted
+  # runners cannot nest virtualisation, so this job is pinned to a self-hosted
+  # runner that has a hypervisor and only runs when dispatched by hand. Normal
+  # pushes stay green even when no such runner exists.
   #
   # To run it: register a self-hosted Linux runner with the labels
   # `self-hosted`, `linux`, `x64`, `kvm` (the last one is a plain custom label —
