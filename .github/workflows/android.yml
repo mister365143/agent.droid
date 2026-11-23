@@ -2,6 +2,7 @@ name: Android CI
 
 on:
   push:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -39,3 +40,64 @@ jobs:
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 14
+
+  # The real thing: install the APK on an Android device and launch MainActivity.
+  # The emulator needs hardware acceleration (/dev/kvm, or the macOS hypervisor
+  # framework) and GitHub-hosted runners cannot nest virtualization, so this job
+  # is pinned to a self-hosted runner that has a hypervisor and only runs when
+  # dispatched by hand. Normal pushes stay green even when no such runner exists.
+  #
+  # To run it: register a self-hosted Linux runner with the labels
+  # `self-hosted`, `linux`, `x64`, `kvm` (the last one is a plain custom label —
+  # it is not verified by GitHub), give its user read/write access to /dev/kvm,
+  # then Actions -> Android CI -> Run workflow on the branch you want to test.
+  device-smoke:
+    name: Device start-up smoke test
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: [self-hosted, linux, x64, kvm]
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      # Fail fast with a useful message instead of a 15-minute emulator boot
+      # timeout: a runner without a hypervisor cannot run this job at all.
+      - name: Check hypervisor is available
+        run: |
+          if [ ! -e /dev/kvm ]; then
+            echo "::error::/dev/kvm is missing. This job needs a self-hosted runner with hardware virtualization enabled and passed through to the runner user."
+            exit 1
+          fi
+          if [ ! -r /dev/kvm ] || [ ! -w /dev/kvm ]; then
+            echo "::error::/dev/kvm exists but is not readable/writable by $(id -un). Grant access with: sudo usermod -aG kvm $(id -un)"
+            exit 1
+          fi
+          echo "KVM is available: $(ls -l /dev/kvm)"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build debug APK
+        run: ./gradlew --no-daemon assembleDebug
+
+      # Boots a real emulator, installs the APK and asserts the app process is
+      # alive, MainActivity is the resumed activity, and the crash buffer is
+      # clean. See .github/scripts/device-smoke.sh.
+      - name: Install and launch on emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          disable-animations: true
+          emulator-options: -no-window -no-audio -no-boot-anim -no-snapshot
+          script: bash .github/scripts/device-smoke.sh
