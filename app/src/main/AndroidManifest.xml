@@ -14,6 +14,24 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!--
+            Screen reading, per ADR 0001. BIND_ACCESSIBILITY_SERVICE means the
+            system can bind it only after the user switches it on in
+            Settings → Accessibility; no app can start it on its own.
+        -->
+        <service
+            android:name=".screen.ScreenAccessService"
+            android:exported="true"
+            android:label="@string/screen_access_label"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/screen_access_service" />
+        </service>
     </application>
 
 </manifest>

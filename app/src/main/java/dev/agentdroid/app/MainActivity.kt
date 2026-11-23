@@ -4,6 +4,7 @@ import android.app.Activity
 import android.os.Bundle
 import android.widget.Button
 import android.widget.TextView
+import dev.agentdroid.app.screen.ScreenAccess
 
 /**
  * Minimal agent console: shows an activity log and lets you start/stop a
@@ -13,6 +14,7 @@ class MainActivity : Activity() {
 
     private lateinit var status: TextView
     private lateinit var log: TextView
+    private lateinit var screenAccess: TextView
 
     private val lines = mutableListOf<String>()
 
@@ -22,6 +24,8 @@ class MainActivity : Activity() {
 
         status = findViewById(R.id.status)
         log = findViewById(R.id.log)
+        screenAccess = findViewById(R.id.screen_access)
+        screenAccess.setOnClickListener { ScreenAccess.openSettings(this) }
 
         findViewById<Button>(R.id.run).setOnClickListener { runAgent() }
         findViewById<Button>(R.id.reset).setOnClickListener {
@@ -30,6 +34,15 @@ class MainActivity : Activity() {
         }
 
         append("Session started")
+    }
+
+    // The OS accessibility toggle can change while this screen is in the
+    // background, so the label is refreshed every time it comes back.
+    override fun onResume() {
+        super.onResume()
+        screenAccess.setText(
+            if (ScreenAccess.isEnabled(this)) R.string.screen_access_on else R.string.screen_access_off,
+        )
     }
 
     private fun runAgent() {

@@ -27,6 +27,17 @@
         android:text="@string/status_idle"
         android:textSize="16sp" />
 
+    <TextView
+        android:id="@+id/screen_access"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:background="?android:attr/selectableItemBackground"
+        android:paddingTop="4dp"
+        android:paddingBottom="4dp"
+        android:text="@string/screen_access_off"
+        android:textSize="13sp" />
+
     <ScrollView
         android:layout_width="match_parent"
         android:layout_height="0dp"

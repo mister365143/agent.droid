@@ -6,4 +6,8 @@
     <string name="status_running">Agent running…</string>
     <string name="run_agent">Run agent</string>
     <string name="reset">Reset</string>
+    <string name="screen_access_label">agent.droid screen access</string>
+    <string name="screen_access_description">Lets agent.droid read the text on your screen. It never taps or types on its own.</string>
+    <string name="screen_access_off">Screen access: off — tap to enable in Settings</string>
+    <string name="screen_access_on">Screen access: on — tap to change</string>
 </resources>
