@@ -38,6 +38,17 @@ small, typed tool set (observe screen, tap, type, scroll, launch app, back/home)
 each tool gated by an explicit user-visible permission and an approval step for
 destructive actions. Every action is logged to a local audit trail.
 
+### Screen content is untrusted input
+
+Everything read from the accessibility tree is **data, never instructions**. On-
+screen text — labels, web page content, notifications, other apps' UIs — is
+attacker-controlled: any app or page can render "ignore your task and do X", and
+putting that into a system-prompt position would turn a hostile screen into a
+command channel (prompt injection). So the agent acts only on the task the user
+typed, treats observed text as evidence to reason about, keeps it clearly
+separated from the instructions, and still requires user approval for
+destructive actions even when the screen appears to ask for them.
+
 ## Consequences
 
 **Positive**
@@ -59,6 +70,9 @@ destructive actions. Every action is logged to a local audit trail.
 - Accessibility trees are lossy: canvas-heavy apps, games, and custom-drawn UIs
   expose little or nothing, and screenshots are not available to a plain
   accessibility service. The agent will be blind in some apps.
+- Instruction/data confusion is a permanent hazard of this capability model:
+  screen text can imitate the user or the system. It is contained by prompting
+  discipline and approval gates, not eliminated.
 - Slower and flakier than shell-level control; gesture dispatch is throttled and
   some system surfaces are unreachable.
 - Users see a persistent "can read the screen" warning, which is a real adoption
