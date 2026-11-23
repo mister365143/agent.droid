@@ -34,13 +34,23 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      - name: Enable KVM access
+        run: |
+          echo "=== /dev/kvm before ==="
+          ls -l /dev/kvm || echo "no /dev/kvm device node present"
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          echo "=== /dev/kvm after ==="
+          ls -l /dev/kvm || echo "no /dev/kvm device node present"
+
       - name: Smoke test on emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 34
           arch: x86_64
           disable-animations: true
-          emulator-boot-timeout: 900
+          emulator-boot-timeout: 600
           script: |
             set -e
             APK=app/build/outputs/apk/debug/app-debug.apk
