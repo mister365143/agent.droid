@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">agent.droid</string>
+    <string name="tagline">Autonomous AI agent platform for Android</string>
+    <string name="status_idle">Agent idle</string>
+    <string name="status_running">Agent running…</string>
+    <string name="run_agent">Run agent</string>
+    <string name="reset">Reset</string>
+</resources>
