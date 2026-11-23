@@ -1,14 +1,19 @@
 package dev.agentdroid.app
 
+import android.content.DialogInterface
+import android.os.Looper
 import android.widget.Button
 import android.widget.TextView
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import org.robolectric.shadows.ShadowAlertDialog
 
 /**
  * Start-up smoke test: builds the real activity, inflates the real layout and
@@ -69,12 +74,20 @@ class MainActivityTest {
     }
 
     @Test
-    fun resetButtonClearsLog() {
+    fun resetAsksBeforeWipingTheTrail() {
         val activity = Robolectric.buildActivity(MainActivity::class.java).setup().get()
-
         activity.findViewById<Button>(R.id.run).performClick()
+        val log = activity.findViewById<TextView>(R.id.log)
+
         activity.findViewById<Button>(R.id.reset).performClick()
 
-        assertEquals("", activity.findViewById<TextView>(R.id.log).text.toString())
+        val dialog = ShadowAlertDialog.getLatestAlertDialog()
+        assertNotNull("expected a confirmation dialog", dialog)
+        assertTrue("trail must survive the tap alone", log.text.toString().contains("Planning task"))
+
+        dialog!!.getButton(DialogInterface.BUTTON_POSITIVE).performClick()
+        shadowOf(Looper.getMainLooper()).idle()
+
+        assertEquals("", log.text.toString())
     }
 }

@@ -1,6 +1,7 @@
 package dev.agentdroid.app
 
 import android.app.Activity
+import android.app.AlertDialog
 import android.os.Bundle
 import android.text.format.DateFormat as AndroidDateFormat
 import android.widget.Button
@@ -44,11 +45,7 @@ class MainActivity : Activity() {
 
         findViewById<Button>(R.id.run).setOnClickListener { runAgent() }
         findViewById<Button>(R.id.capture).setOnClickListener { captureScreen() }
-        findViewById<Button>(R.id.reset).setOnClickListener {
-            entries.clear()
-            trail.clear()
-            render()
-        }
+        findViewById<Button>(R.id.reset).setOnClickListener { confirmReset() }
 
         append("Session started")
     }
@@ -60,6 +57,21 @@ class MainActivity : Activity() {
         screenAccess.setText(
             if (ScreenAccess.isEnabled(this)) R.string.screen_access_on else R.string.screen_access_off,
         )
+    }
+
+    /** Wiping the trail is irreversible, so a stray tap must not do it. */
+    private fun confirmReset() {
+        if (entries.isEmpty()) return
+        AlertDialog.Builder(this)
+            .setTitle(R.string.reset_confirm_title)
+            .setMessage(R.string.reset_confirm_message)
+            .setNegativeButton(R.string.cancel, null)
+            .setPositiveButton(R.string.reset) { _, _ ->
+                entries.clear()
+                trail.clear()
+                render()
+            }
+            .show()
     }
 
     private fun runAgent() {

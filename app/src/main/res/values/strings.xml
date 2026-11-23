@@ -6,6 +6,9 @@
     <string name="status_running">Agent running…</string>
     <string name="run_agent">Run agent</string>
     <string name="reset">Reset</string>
+    <string name="cancel">Cancel</string>
+    <string name="reset_confirm_title">Wipe audit trail?</string>
+    <string name="reset_confirm_message">This deletes the stored session history on this device. It can\'t be undone.</string>
     <string name="screen_access_label">agent.droid screen access</string>
     <string name="screen_access_description">Lets agent.droid read the text on your screen. It never taps or types on its own.</string>
     <string name="screen_access_off">Screen access: off — tap to enable in Settings</string>
