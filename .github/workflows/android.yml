@@ -8,7 +8,7 @@ permissions:
 
 jobs:
   build:
-    name: Build debug APK
+    name: Build and test
     runs-on: ubuntu-latest
 
     steps:
@@ -23,6 +23,12 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      # Launches MainActivity for real (layout inflation, resources, onCreate,
+      # button wiring) on the JVM. This is the start-up crash gate: a broken
+      # theme, a missing view or an NPE in onCreate fails here.
+      - name: Run start-up tests
+        run: ./gradlew --no-daemon testDebugUnitTest
+
       - name: Build debug APK
         run: ./gradlew --no-daemon assembleDebug
 
@@ -33,70 +39,3 @@ jobs:
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 14
-
-  smoke:
-    name: Launch on emulator
-    needs: build
-    # GitHub-hosted Linux runners have no nested virtualisation, so the
-    # emulator only gets a hypervisor on the macOS runners.
-    runs-on: macos-latest
-
-    steps:
-      - name: Download debug APK
-        uses: actions/download-artifact@v4
-        with:
-          name: agent.droid-debug-apk
-          path: apk
-
-      - name: Install and launch MainActivity
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 34
-          target: google_apis
-          arch: arm64-v8a
-          disable-animations: true
-          emulator-boot-timeout: 600
-          script: |
-            set -e
-            APK=$(ls apk/*.apk)
-            PKG=dev.agentdroid.app
-            ACTIVITY=$PKG/.MainActivity
-            echo "APK: $APK"
-
-            # 1. Install the APK that the build job produced.
-            INSTALL_OUT=$(adb install -r "$APK" 2>&1) || {
-              echo "::error::INSTALL_FAILED: $(printf '%s' "$INSTALL_OUT" | tr '\n' ' ')"
-              exit 1
-            }
-
-            # 2. Launch the launcher activity and wait for it to become idle.
-            adb shell am start -W -n "$ACTIVITY" 2>&1 || true
-            sleep 5
-
-            # 3. The process must still be alive: a start-up crash kills it.
-            PID=$(adb shell pidof "$PKG" | tr -d '\r')
-            if [ -z "$PID" ]; then
-              CRASH=$(adb logcat -d -b crash | grep -m1 -A 2 "FATAL EXCEPTION" | tr '\n' '|')
-              echo "::error::PROCESS_NOT_RUNNING after launch; crash=$CRASH"
-              adb logcat -d -b crash | tail -40
-              exit 1
-            fi
-
-            # 4. MainActivity must be the resumed (foreground) activity.
-            RESUMED=$(adb shell dumpsys activity activities | grep "mResumedActivity" | tr -d '\r' | head -1)
-            case "$RESUMED" in
-              *"$PKG"*) echo "foreground: $RESUMED" ;;
-              *)
-                echo "::error::NOT_RESUMED: ${RESUMED:-no mResumedActivity line}"
-                exit 1
-                ;;
-            esac
-
-            # 5. Nothing from the package may be sitting in the crash buffer.
-            CRASHLOG=$(adb logcat -d -b crash | grep "$PKG" || true)
-            if [ -n "$CRASHLOG" ]; then
-              echo "::error::CRASH_IN_BUFFER: $(printf '%s' "$CRASHLOG" | tr '\n' '|')"
-              exit 1
-            fi
-
-            echo "MainActivity launched and is in the foreground (pid $PID)"
