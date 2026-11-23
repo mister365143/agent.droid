@@ -54,22 +54,43 @@ jobs:
           script: |
             set -e
             APK=app/build/outputs/apk/debug/app-debug.apk
+            PKG=dev.agentdroid.app
+            ACTIVITY=$PKG/.MainActivity
 
-            adb install -r "$APK"
-            adb shell am start -W -n dev.agentdroid.app/.MainActivity
+            # 1. Install the APK we just built.
+            INSTALL_OUT=$(adb install -r "$APK" 2>&1) || {
+              echo "::error::INSTALL_FAILED: $(printf '%s' "$INSTALL_OUT" | tr '\n' ' ')"
+              exit 1
+            }
+
+            # 2. Launch the launcher activity and wait for it to become idle.
+            adb shell am start -W -n "$ACTIVITY" 2>&1 || true
             sleep 5
 
-            # The process must still be alive, not have died on start-up.
-            adb shell pidof dev.agentdroid.app > /dev/null
-
-            # MainActivity must actually be the resumed (foreground) activity.
-            adb shell dumpsys activity activities | grep -q "mResumedActivity.*dev.agentdroid.app"
-
-            # The crash buffer must not mention us.
-            if adb logcat -d -b crash | grep -q "dev.agentdroid.app"; then
-              echo "::error::agent.droid crashed on launch"
-              adb logcat -d -b crash
+            # 3. The process must still be alive: a start-up crash kills it.
+            PID=$(adb shell pidof "$PKG" | tr -d '\r')
+            if [ -z "$PID" ]; then
+              CRASH=$(adb logcat -d -b crash | grep -m1 -A 2 "FATAL EXCEPTION" | tr '\n' '|')
+              echo "::error::PROCESS_NOT_RUNNING after launch; crash=$CRASH"
+              adb logcat -d -b crash | tail -40
               exit 1
             fi
 
-            echo "MainActivity launched and is in the foreground"
+            # 4. MainActivity must be the resumed (foreground) activity.
+            RESUMED=$(adb shell dumpsys activity activities | grep "mResumedActivity" | tr -d '\r' | head -1)
+            case "$RESUMED" in
+              *"$PKG"*) echo "foreground: $RESUMED" ;;
+              *)
+                echo "::error::NOT_RESUMED: ${RESUMED:-no mResumedActivity line}"
+                exit 1
+                ;;
+            esac
+
+            # 5. Nothing from the package may be sitting in the crash buffer.
+            CRASHLOG=$(adb logcat -d -b crash | grep "$PKG" || true)
+            if [ -n "$CRASHLOG" ]; then
+              echo "::error::CRASH_IN_BUFFER: $(printf '%s' "$CRASHLOG" | tr '\n' '|')"
+              exit 1
+            fi
+
+            echo "MainActivity launched and is in the foreground (pid $PID)"
